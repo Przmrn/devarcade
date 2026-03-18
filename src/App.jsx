@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import Hub from './games/hub/Hub.jsx'
 import PathQuest from './games/pathquest/PathQuest.jsx'
+import FreightCommander from './games/freight/FreightCommander.jsx'
 
 // Placeholder — we'll replace these one by one as we build each game
 function ComingSoon({ name }) {
@@ -14,7 +15,7 @@ function ComingSoon({ name }) {
 
 const GAMES = {
   pathquest: { title: 'PathQuest', component: PathQuest },
-  freight: { title: 'Freight Commander', component: () => <ComingSoon name="Freight Commander" /> },
+  freight: { title: 'Freight Commander', component: FreightCommander },
   vision: { title: 'Vision Hunt', component: () => <ComingSoon name="Vision Hunt" /> },
   hashbreaker: { title: 'Hash Breaker', component: () => <ComingSoon name="Hash Breaker" /> },
   codebreaker: { title: 'Codebreaker', component: () => <ComingSoon name="Codebreaker" /> },
