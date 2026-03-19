@@ -1,18 +1,16 @@
 // FreightCommander.jsx
-// Top-down logistics game. Click a truck, click a destination.
-// Trucks move along the grid, deliver cargo, earn revenue.
+// All UI chrome uses CSS variables.
+// Game uses SVG canvas for the city grid.
 
 import { useState, useEffect, useRef } from 'react'
-import { Fuel, DollarSign, Star, AlertTriangle } from 'lucide-react'
 import { sounds } from '../../utils/useSound.js'
 
-const GRID       = 10
-const CELL       = 54
-const SVG_SIZE   = GRID * CELL
+const GRID         = 10
+const CELL         = 52
+const SVG_SIZE     = GRID * CELL
 const TRUCK_COLORS = ['#3b82f6', '#f59e0b', '#10b981']
-const CARGO_TYPES  = ['📦 Boxes', '🧊 Frozen', '⚗️ Chemical', '🔩 Parts']
-
-// ── Pure helpers ───────────────────────────────────────────────
+const CARGO_TYPES  = ['BOXES', 'FROZEN', 'CHEMICAL', 'PARTS']
+const CARGO_ICONS  = { BOXES: '📦', FROZEN: '🧊', CHEMICAL: '⚗️', PARTS: '🔩' }
 
 function randomDropoffs() {
   const used = new Set(['5,5'])
@@ -21,27 +19,15 @@ function randomDropoffs() {
     const row = Math.floor(Math.random() * GRID)
     const col = Math.floor(Math.random() * GRID)
     const key = `${row},${col}`
-    if (!used.has(key)) {
-      used.add(key)
-      result.push({ id: result.length, row, col })
-    }
+    if (!used.has(key)) { used.add(key); result.push({ id: result.length, row, col }) }
   }
   return result
 }
 
 function makeTruck(id) {
-  return {
-    id,
-    row: 5, col: 5,
-    path: [], pathIdx: 0,
-    cargo: null,
-    fuel: 100,
-    status: 'idle',      // 'idle' | 'moving'
-    destination: null,
-  }
+  return { id, row: 5, col: 5, path: [], pathIdx: 0, cargo: null, fuel: 100, status: 'idle', destination: null }
 }
 
-// Walk from (fromRow,fromCol) to (toRow,toCol) — horizontal first
 function buildPath(from, to) {
   const path = []
   let { row, col } = from
@@ -50,23 +36,39 @@ function buildPath(from, to) {
   return path
 }
 
-let orderIdSeq = 0
+let orderSeq = 0
 function makeOrder(dropoffs) {
   return {
-    id:       ++orderIdSeq,
+    id:        ++orderSeq,
     dropoffId: dropoffs[Math.floor(Math.random() * dropoffs.length)].id,
-    cargo:    CARGO_TYPES[Math.floor(Math.random() * CARGO_TYPES.length)],
-    timeLeft: 30 + Math.floor(Math.random() * 20),
-    reward:   200 + Math.floor(Math.random() * 300),
+    cargo:     CARGO_TYPES[Math.floor(Math.random() * CARGO_TYPES.length)],
+    timeLeft:  30 + Math.floor(Math.random() * 20),
+    reward:    200 + Math.floor(Math.random() * 300),
   }
 }
 
-// SVG centre of a grid cell
 function centre(row, col) {
   return { x: col * CELL + CELL / 2, y: row * CELL + CELL / 2 }
 }
 
-// ── Component ──────────────────────────────────────────────────
+// Themed stat box
+function StatBox({ label, value, color }) {
+  return (
+    <div style={{
+      flex:       1,
+      padding:    '8px 10px',
+      border:     '1px solid var(--border)',
+      background: 'var(--bg2)',
+    }}>
+      <p style={{ fontSize: 9, letterSpacing: '0.14em', color: 'var(--text-muted)', marginBottom: 3 }}>
+        {label}
+      </p>
+      <p style={{ fontSize: 16, fontWeight: 700, color: color || 'var(--accent)', letterSpacing: '0.06em' }}>
+        {value}
+      </p>
+    </div>
+  )
+}
 
 export default function FreightCommander() {
   const [dropoffs]              = useState(randomDropoffs)
@@ -80,9 +82,8 @@ export default function FreightCommander() {
   const [gameOver, setGameOver] = useState(false)
   const [showHow,  setShowHow]  = useState(false)
 
-  const addLog = (msg) => setLog(l => [msg, ...l.slice(0, 7)])
+  const addLog = msg => setLog(l => [`> ${msg}`, ...l.slice(0, 9)])
 
-  // Game tick every 650ms
   useEffect(() => {
     if (gameOver) return
     const id = setInterval(() => setTick(t => t + 1), 650)
@@ -92,24 +93,15 @@ export default function FreightCommander() {
   useEffect(() => {
     if (tick === 0) return
 
-    // 1. Move trucks one step along their path
+    // Move trucks
     setTrucks(prev => prev.map(t => {
       if (t.status !== 'moving' || t.path.length === 0) return t
       const next = t.path[t.pathIdx]
-      if (!next) {
-        // Arrived at destination
-        return { ...t, status: 'idle', path: [], pathIdx: 0 }
-      }
-      return {
-        ...t,
-        row:     next.row,
-        col:     next.col,
-        pathIdx: t.pathIdx + 1,
-        fuel:    Math.max(0, t.fuel - 2),
-      }
+      if (!next) return { ...t, status: 'idle', path: [], pathIdx: 0 }
+      return { ...t, row: next.row, col: next.col, pathIdx: t.pathIdx + 1, fuel: Math.max(0, t.fuel - 2) }
     }))
 
-    // 2. Check deliveries — truck idle at a dropoff with matching cargo
+    // Check deliveries
     setTrucks(prev => {
       const updated = [...prev]
       updated.forEach((t, i) => {
@@ -120,7 +112,7 @@ export default function FreightCommander() {
           const order = prev.find(o => o.dropoffId === drop.id && o.cargo === t.cargo)
           if (!order) return prev
           setRevenue(r => r + order.reward)
-          addLog(`✓ Truck ${t.id + 1} delivered ${t.cargo} +$${order.reward}`)
+          addLog(`T${t.id + 1} DELIVERED ${t.cargo} +$${order.reward}`)
           sounds.success()
           updated[i] = { ...t, cargo: null, destination: null }
           return prev.filter(o => o.id !== order.id)
@@ -129,7 +121,7 @@ export default function FreightCommander() {
       return updated
     })
 
-    // 3. Tick order timers — remove expired ones, hit reputation
+    // Tick order timers
     setOrders(prev => {
       const ticked  = prev.map(o => ({ ...o, timeLeft: o.timeLeft - 1 }))
       const expired = ticked.filter(o => o.timeLeft <= 0)
@@ -140,19 +132,19 @@ export default function FreightCommander() {
           return next
         })
         sounds.error()
-        addLog(`⚠ ${expired.length} order(s) expired! Rep -${expired.length * 10}`)
+        addLog(`${expired.length} ORDER(S) EXPIRED`)
       }
       return ticked.filter(o => o.timeLeft > 0)
     })
 
-    // 4. Refuel trucks parked at warehouse
+    // Refuel at warehouse
     setTrucks(prev => prev.map(t =>
       (t.row === 5 && t.col === 5 && t.status === 'idle')
         ? { ...t, fuel: Math.min(100, t.fuel + 15) }
         : t
     ))
 
-    // 5. Spawn new orders occasionally
+    // Spawn orders
     if (tick % 5 === 0 && orders.length < 5) {
       setOrders(o => [...o, makeOrder(dropoffs)])
     }
@@ -169,18 +161,13 @@ export default function FreightCommander() {
     if (selected === null || gameOver) return
     const truck = trucks.find(t => t.id === selected)
     if (!truck || truck.status === 'moving') return
-
-    // Load matching cargo for this dropoff, or first available
-    const order   = orders.find(o => o.dropoffId === dropoff.id)
-    const cargo   = order?.cargo ?? CARGO_TYPES[0]
-    const path    = buildPath({ row: truck.row, col: truck.col }, dropoff)
-
+    const order = orders.find(o => o.dropoffId === dropoff.id)
+    const cargo = order?.cargo ?? CARGO_TYPES[0]
+    const path  = buildPath({ row: truck.row, col: truck.col }, dropoff)
     setTrucks(prev => prev.map(t =>
-      t.id === selected
-        ? { ...t, status: 'moving', path, pathIdx: 0, cargo, destination: dropoff }
-        : t
+      t.id === selected ? { ...t, status: 'moving', path, pathIdx: 0, cargo, destination: dropoff } : t
     ))
-    addLog(`Truck ${selected + 1} → Drop #${dropoff.id + 1}`)
+    addLog(`T${selected + 1} DISPATCHED → DROP #${dropoff.id + 1}`)
     sounds.launch()
     setSelected(null)
   }
@@ -193,265 +180,369 @@ export default function FreightCommander() {
     setTrucks(prev => prev.map(t =>
       t.id === selected ? { ...t, status: 'moving', path, pathIdx: 0 } : t
     ))
+    addLog(`T${selected + 1} RETURNING TO BASE`)
     sounds.click()
     setSelected(null)
   }
 
   function reset() {
-    orderIdSeq = 0
+    orderSeq = 0
     setTrucks([0, 1, 2].map(makeTruck))
-    setOrders([])
-    setRevenue(0)
-    setRep(100)
-    setSelected(null)
-    setLog([])
-    setGameOver(false)
-    setTick(0)
+    setOrders([]); setRevenue(0); setRep(100)
+    setSelected(null); setLog([]); setGameOver(false); setTick(0)
   }
 
+  const repColor = rep > 60 ? '#34d399' : rep > 30 ? '#f59e0b' : '#f43f5e'
+
   return (
-    <div className="flex h-full bg-gray-950 overflow-hidden">
+    <div style={{
+      display:    'flex',
+      height:     '100%',
+      overflow:   'hidden',
+      background: 'var(--bg)',
+      fontFamily: 'var(--font)',
+    }}>
 
-      {/* ── Map canvas ── */}
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="relative">
-          <svg
-            width={SVG_SIZE}
-            height={SVG_SIZE}
-            className="rounded-xl border border-white/10 bg-gray-900"
-          >
-            {/* Grid lines */}
-            {Array.from({ length: GRID + 1 }, (_, i) => (
-              <g key={i}>
-                <line x1={i * CELL} y1={0}        x2={i * CELL}    y2={SVG_SIZE} stroke="#1e293b" strokeWidth="0.5" />
-                <line x1={0}        y1={i * CELL}  x2={SVG_SIZE}    y2={i * CELL} stroke="#1e293b" strokeWidth="0.5" />
-              </g>
-            ))}
-
-            {/* Road highlights — cross through warehouse */}
-            <rect x={5 * CELL} y={0}        width={CELL} height={SVG_SIZE} fill="#0f172a" opacity={0.7} />
-            <rect x={0}        y={5 * CELL} width={SVG_SIZE} height={CELL} fill="#0f172a" opacity={0.7} />
-
-            {/* Warehouse */}
-            <g onClick={handleWarehouseClick} className="cursor-pointer">
-              <rect
-                x={5 * CELL + 3} y={5 * CELL + 3}
-                width={CELL - 6} height={CELL - 6} rx={6}
-                fill={selected !== null ? '#92400e' : '#1c1917'}
-                stroke="#f59e0b" strokeWidth="1.5"
-              />
-              <text
-                x={5 * CELL + CELL / 2} y={5 * CELL + CELL / 2}
-                textAnchor="middle" dominantBaseline="central"
-                fontSize={20}
-              >🏭</text>
-            </g>
-
-            {/* Dropoff nodes */}
-            {dropoffs.map(d => {
-              const { x, y } = centre(d.row, d.col)
-              const order    = orders.find(o => o.dropoffId === d.id)
-              return (
-                <g key={d.id} onClick={() => handleDropoffClick(d)} className="cursor-pointer">
-                  <rect
-                    x={d.col * CELL + 3} y={d.row * CELL + 3}
-                    width={CELL - 6} height={CELL - 6} rx={6}
-                    fill={order ? '#14532d' : '#0f172a'}
-                    stroke={order ? '#4ade80' : '#334155'}
-                    strokeWidth="1.5"
-                  />
-                  <text x={x} y={y - 5} textAnchor="middle" dominantBaseline="central" fontSize={16}>📍</text>
-                  {order && (
-                    <text x={x} y={y + 12} textAnchor="middle" fontSize={9} fill="#4ade80">
-                      {order.timeLeft}s
-                    </text>
-                  )}
-                </g>
-              )
-            })}
-
-            {/* Trucks */}
-            {trucks.map(t => {
-              const { x, y } = centre(t.row, t.col)
-              const color     = TRUCK_COLORS[t.id]
-              const isSel     = selected === t.id
-              return (
-                <g
-                  key={t.id}
-                  onClick={() => handleTruckClick(t.id)}
-                  className="cursor-pointer"
-                  transform={`translate(${x},${y})`}
-                >
-                  <circle r={15} fill={color} opacity={isSel ? 0.25 : 0.12} />
-                  <circle
-                    r={11} fill={color} opacity={0.9}
-                    stroke={isSel ? 'white' : color}
-                    strokeWidth={isSel ? 2.5 : 1}
-                  />
-                  <text textAnchor="middle" dominantBaseline="central" fontSize={12}>🚛</text>
-                  {t.cargo && (
-                    <text x={0} y={18} textAnchor="middle" fontSize={8} fill="white" opacity={0.8}>📦</text>
-                  )}
-                  <text x={0} y={-18} textAnchor="middle" fontSize={8} fill={color}>{t.id + 1}</text>
-                </g>
-              )
-            })}
-          </svg>
-
-          {/* Game over overlay */}
-          {gameOver && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 rounded-xl">
-              <p className="text-4xl font-black text-rose-400 mb-2">GAME OVER</p>
-              <p className="text-slate-400 mb-4">Reputation hit zero</p>
-              <p className="text-2xl font-bold text-amber-400 mb-6">Final: ${revenue}</p>
-              <button
-                onClick={reset}
-                className="px-6 py-2.5 rounded-lg bg-amber-500 text-black font-bold hover:bg-amber-400 transition-colors"
-              >
-                Play Again
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Sidebar ── */}
-      <div className="w-64 flex-shrink-0 flex flex-col gap-3 p-4 bg-gray-900/60 border-l border-white/5 overflow-y-auto">
+      {/* ── Left sidebar ───────────────────────────────────────── */}
+      <div style={{
+        width:        200,
+        flexShrink:   0,
+        display:      'flex',
+        flexDirection:'column',
+        background:   'var(--bg2)',
+        borderRight:  '1px solid var(--border)',
+        overflowY:    'auto',
+      }}>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-2">
-          <div className="bg-amber-950/40 border border-amber-800/30 rounded-lg p-3">
-            <p className="text-[10px] text-amber-600 mb-1">REVENUE</p>
-            <p className="text-lg font-bold text-amber-400">${revenue}</p>
+        <div style={{ padding: '14px 12px', borderBottom: '1px solid var(--border-dim)' }}>
+          <p style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--text-muted)', marginBottom: 8 }}>
+            // STATUS
+          </p>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+            <StatBox label="REVENUE" value={`$${revenue}`} />
+            <StatBox label="REP"     value={`${rep}%`} color={repColor} />
           </div>
-          <div className="bg-rose-950/40 border border-rose-800/30 rounded-lg p-3">
-            <p className="text-[10px] text-rose-600 mb-1">REPUTATION</p>
-            <p className="text-lg font-bold text-rose-400">{rep}%</p>
+
+          {/* Rep bar */}
+          <div style={{ height: 2, background: 'var(--border)', position: 'relative' }}>
+            <div style={{
+              position:   'absolute',
+              left:       0,
+              width:      `${rep}%`,
+              height:     '100%',
+              background: repColor,
+              transition: 'width 0.3s',
+            }} />
           </div>
         </div>
-
-        {/* Reputation bar */}
-        <div className="w-full bg-slate-800 rounded-full h-1.5">
-          <div
-            className="h-full rounded-full transition-all"
-            style={{
-              width: `${rep}%`,
-              background: rep > 60 ? '#4ade80' : rep > 30 ? '#fbbf24' : '#f43f5e',
-            }}
-          />
-        </div>
-
-        <div className="h-px bg-white/5" />
 
         {/* Fleet */}
-        <p className="text-[10px] text-slate-500 font-semibold tracking-wider">FLEET</p>
-        {trucks.map(t => (
-          <div
-            key={t.id}
-            onClick={() => handleTruckClick(t.id)}
-            className={`rounded-lg p-3 cursor-pointer border transition-all ${
-              selected === t.id
-                ? 'border-white/30 bg-white/10'
-                : 'border-white/5 bg-white/3 hover:border-white/10'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-bold" style={{ color: TRUCK_COLORS[t.id] }}>
-                Truck {t.id + 1}
-              </span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                t.status === 'moving'
-                  ? 'bg-blue-500/20 text-blue-400'
-                  : 'bg-slate-700 text-slate-400'
-              }`}>
-                {t.status}
-              </span>
-            </div>
-
-            {/* Fuel bar */}
-            <div className="flex items-center gap-2 text-[10px] text-slate-500 mb-1">
-              <Fuel size={10} />
-              <div className="flex-1 bg-slate-800 rounded-full h-1.5">
+        <div style={{ padding: '14px 12px', borderBottom: '1px solid var(--border-dim)' }}>
+          <p style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--text-muted)', marginBottom: 8 }}>
+            // FLEET
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {trucks.map(t => {
+              const color   = TRUCK_COLORS[t.id]
+              const isSel   = selected === t.id
+              return (
                 <div
-                  className="h-full rounded-full transition-all"
+                  key={t.id}
+                  onClick={() => handleTruckClick(t.id)}
                   style={{
-                    width:      `${t.fuel}%`,
-                    background: t.fuel > 50 ? '#4ade80' : t.fuel > 20 ? '#fbbf24' : '#f43f5e',
+                    padding:    '8px 10px',
+                    border:     `1px solid ${isSel ? color : 'var(--border)'}`,
+                    background: isSel ? `${color}12` : 'transparent',
+                    cursor:     'pointer',
                   }}
-                />
-              </div>
-              <span>{t.fuel}%</span>
-            </div>
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: '0.12em' }}>
+                      TRUCK {t.id + 1}
+                    </span>
+                    <span style={{
+                      fontSize:   9,
+                      letterSpacing: '0.1em',
+                      color: t.status === 'moving' ? '#60a5fa' : 'var(--text-muted)',
+                    }}>
+                      {t.status.toUpperCase()}
+                    </span>
+                  </div>
 
-            {t.cargo && (
-              <p className="text-[10px] text-slate-400">{t.cargo}</p>
-            )}
+                  {/* Fuel bar */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 8, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>FUEL</span>
+                    <div style={{ flex: 1, height: 2, background: 'var(--border)' }}>
+                      <div style={{
+                        height:     '100%',
+                        width:      `${t.fuel}%`,
+                        background: t.fuel > 50 ? '#34d399' : t.fuel > 20 ? '#f59e0b' : '#f43f5e',
+                        transition: 'width 0.3s',
+                      }} />
+                    </div>
+                    <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>{t.fuel}%</span>
+                  </div>
+
+                  {t.cargo && (
+                    <p style={{ fontSize: 8, color: 'var(--accent-dim)', marginTop: 4, letterSpacing: '0.1em' }}>
+                      {CARGO_ICONS[t.cargo]} {t.cargo}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
           </div>
-        ))}
+        </div>
 
-        <div className="h-px bg-white/5" />
-
-        {/* Active orders */}
-        <p className="text-[10px] text-slate-500 font-semibold tracking-wider">
-          ORDERS ({orders.length})
-        </p>
-        <div className="flex flex-col gap-2 flex-1 overflow-y-auto min-h-0">
-          {orders.length === 0 && (
-            <p className="text-xs text-slate-600 italic">Waiting for orders…</p>
-          )}
-          {orders.map(o => {
-            const drop = dropoffs.find(d => d.id === o.dropoffId)
-            return (
-              <div
-                key={o.id}
-                className={`rounded-lg p-2.5 border text-xs ${
-                  o.timeLeft < 10
-                    ? 'border-rose-800/50 bg-rose-950/30'
-                    : 'border-white/5 bg-white/3'
-                }`}
-              >
-                <div className="flex justify-between mb-1">
-                  <span className="font-semibold text-white">Drop #{o.dropoffId + 1}</span>
-                  <span className={`font-mono font-bold ${o.timeLeft < 10 ? 'text-rose-400' : 'text-slate-400'}`}>
+        {/* Orders */}
+        <div style={{ padding: '14px 12px', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <p style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--text-muted)', marginBottom: 8, flexShrink: 0 }}>
+            // ORDERS ({orders.length})
+          </p>
+          <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {orders.length === 0 && (
+              <p style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.1em', fontStyle: 'italic' }}>
+                AWAITING ORDERS...
+              </p>
+            )}
+            {orders.map(o => (
+              <div key={o.id} style={{
+                padding:    '7px 9px',
+                border:     `1px solid ${o.timeLeft < 10 ? 'rgba(244,63,94,0.4)' : 'var(--border)'}`,
+                background: o.timeLeft < 10 ? 'rgba(244,63,94,0.05)' : 'var(--bg)',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)', letterSpacing: '0.1em' }}>
+                    DROP #{o.dropoffId + 1}
+                  </span>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+                    color: o.timeLeft < 10 ? '#f43f5e' : 'var(--text-muted)',
+                  }}>
                     {o.timeLeft}s
                   </span>
                 </div>
-                <p className="text-slate-400">{o.cargo}</p>
-                <p className="text-amber-400 font-semibold">${o.reward}</p>
+                <p style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
+                  {CARGO_ICONS[o.cargo]} {o.cargo}
+                </p>
+                <p style={{ fontSize: 9, color: 'var(--accent)', letterSpacing: '0.1em', marginTop: 2 }}>
+                  ${o.reward}
+                </p>
               </div>
-            )
-          })}
-        </div>
-
-        <div className="h-px bg-white/5" />
-
-        {/* Log */}
-        <p className="text-[10px] text-slate-500 font-semibold tracking-wider">LOG</p>
-        <div className="space-y-1">
-          {log.map((l, i) => (
-            <p key={i} className="text-[10px] text-slate-500 font-mono">{l}</p>
-          ))}
-        </div>
-
-        {/* How to play toggle */}
-        <button
-          onClick={() => setShowHow(h => !h)}
-          className="mt-2 text-[10px] text-violet-400 hover:text-violet-300 transition-colors text-left"
-        >
-          {showHow ? '▲ Hide guide' : '▼ How to play'}
-        </button>
-
-        {showHow && (
-          <div className="bg-slate-900 rounded-lg p-3 text-[10px] text-slate-400 leading-relaxed space-y-1.5 border border-white/5">
-            <p><span className="text-white font-semibold">1.</span> Click a truck to select it</p>
-            <p><span className="text-white font-semibold">2.</span> Click a 📍 dropoff to dispatch it with matching cargo</p>
-            <p><span className="text-white font-semibold">3.</span> Deliver before the timer hits zero or reputation drops</p>
-            <p><span className="text-white font-semibold">4.</span> Return trucks to 🏭 to refuel</p>
-            <p><span className="text-white font-semibold">5.</span> Reputation hits 0 → game over</p>
+            ))}
           </div>
-        )}
+        </div>
 
       </div>
+
+      {/* ── Map ────────────────────────────────────────────────── */}
+      <div style={{
+        flex:           1,
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'center',
+        background:     'var(--bg)',
+        padding:        16,
+        position:       'relative',
+      }}>
+        <svg
+          width={SVG_SIZE} height={SVG_SIZE}
+          style={{ border: '1px solid var(--border)', background: 'var(--bg2)' }}
+        >
+          {/* Grid lines */}
+          {Array.from({ length: GRID + 1 }, (_, i) => (
+            <g key={i}>
+              <line x1={i * CELL} y1={0}       x2={i * CELL}  y2={SVG_SIZE} stroke="var(--border-dim)" strokeWidth="0.5" />
+              <line x1={0}        y1={i * CELL} x2={SVG_SIZE}  y2={i * CELL} stroke="var(--border-dim)" strokeWidth="0.5" />
+            </g>
+          ))}
+
+          {/* Road cross */}
+          <rect x={5 * CELL} y={0}        width={CELL} height={SVG_SIZE} fill="var(--bg3)" opacity={0.7} />
+          <rect x={0}        y={5 * CELL} width={SVG_SIZE} height={CELL} fill="var(--bg3)" opacity={0.7} />
+
+          {/* Warehouse */}
+          <g onClick={handleWarehouseClick} style={{ cursor: 'pointer' }}>
+            <rect
+              x={5 * CELL + 3} y={5 * CELL + 3}
+              width={CELL - 6} height={CELL - 6}
+              fill={selected !== null ? 'var(--accent-bg)' : 'var(--bg3)'}
+              stroke="var(--accent)" strokeWidth="1"
+            />
+            <text
+              x={5 * CELL + CELL / 2} y={5 * CELL + CELL / 2}
+              textAnchor="middle" dominantBaseline="central" fontSize={18}
+            >🏭</text>
+          </g>
+
+          {/* Dropoffs */}
+          {dropoffs.map(d => {
+            const { x, y } = centre(d.row, d.col)
+            const order    = orders.find(o => o.dropoffId === d.id)
+            return (
+              <g key={d.id} onClick={() => handleDropoffClick(d)} style={{ cursor: 'pointer' }}>
+                <rect
+                  x={d.col * CELL + 3} y={d.row * CELL + 3}
+                  width={CELL - 6} height={CELL - 6}
+                  fill={order ? 'rgba(52,211,153,0.08)' : 'var(--bg3)'}
+                  stroke={order ? '#34d399' : 'var(--border)'}
+                  strokeWidth="1"
+                />
+                <text x={x} y={y - 5} textAnchor="middle" dominantBaseline="central" fontSize={14}>📍</text>
+                {order && (
+                  <text x={x} y={y + 12} textAnchor="middle" fontSize={8}
+                    fill="#34d399" fontFamily="var(--font)">{order.timeLeft}s</text>
+                )}
+              </g>
+            )
+          })}
+
+          {/* Trucks */}
+          {trucks.map(t => {
+            const { x, y } = centre(t.row, t.col)
+            const color     = TRUCK_COLORS[t.id]
+            const isSel     = selected === t.id
+            return (
+              <g key={t.id} onClick={() => handleTruckClick(t.id)}
+                style={{ cursor: 'pointer' }}
+                transform={`translate(${x},${y})`}>
+                {isSel && <circle r={18} fill={color} opacity={0.12} />}
+                <rect x={-11} y={-11} width={22} height={22}
+                  fill={color} opacity={0.9}
+                  stroke={isSel ? 'white' : color} strokeWidth={isSel ? 2 : 0.5}
+                />
+                <text textAnchor="middle" dominantBaseline="central" fontSize={11}>🚛</text>
+                <text x={0} y={-17} textAnchor="middle" fontSize={7}
+                  fill={color} fontFamily="var(--font)" fontWeight="700">
+                  T{t.id + 1}
+                </text>
+                {t.cargo && (
+                  <text x={14} y={-14} textAnchor="middle" fontSize={9}>
+                    {CARGO_ICONS[t.cargo]}
+                  </text>
+                )}
+              </g>
+            )
+          })}
+        </svg>
+
+        {/* Game Over overlay */}
+        {gameOver && (
+          <div style={{
+            position:       'absolute', inset: 0,
+            display:        'flex', flexDirection: 'column',
+            alignItems:     'center', justifyContent: 'center',
+            background:     'rgba(0,0,0,0.85)',
+            fontFamily:     'var(--font)',
+          }}>
+            <p style={{ fontSize: 32, fontWeight: 700, color: '#f43f5e', letterSpacing: '0.1em', marginBottom: 8 }}>
+              GAME OVER
+            </p>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.2em', marginBottom: 4 }}>
+              REPUTATION DEPLETED
+            </p>
+            <p style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', marginBottom: 24 }}>
+              FINAL: ${revenue}
+            </p>
+            <button
+              onClick={reset}
+              style={{
+                padding:       '8px 24px',
+                border:        '1px solid var(--accent)',
+                background:    'var(--accent-bg)',
+                color:         'var(--accent)',
+                fontFamily:    'var(--font)',
+                fontSize:      11,
+                letterSpacing: '0.18em',
+                cursor:        'pointer',
+              }}
+            >
+              ⟳ RESTART
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Right sidebar ──────────────────────────────────────── */}
+      <div style={{
+        width:        180,
+        flexShrink:   0,
+        display:      'flex',
+        flexDirection:'column',
+        background:   'var(--bg2)',
+        borderLeft:   '1px solid var(--border)',
+        overflowY:    'auto',
+      }}>
+
+        {/* Log */}
+        <div style={{ padding: '14px 12px', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <p style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--text-muted)', marginBottom: 8, flexShrink: 0 }}>
+            // LOG
+          </p>
+          <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {log.map((l, i) => (
+              <p key={i} style={{
+                fontSize:      9,
+                color:         i === 0 ? 'var(--accent-dim)' : 'var(--text-muted)',
+                letterSpacing: '0.06em',
+                lineHeight:    1.5,
+              }}>
+                {l}
+              </p>
+            ))}
+            {log.length === 0 && (
+              <p style={{ fontSize: 9, color: 'var(--text-muted)', fontStyle: 'italic', letterSpacing: '0.1em' }}>
+                NO EVENTS
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* How to play */}
+        <div style={{ padding: '14px 12px', borderTop: '1px solid var(--border-dim)' }}>
+          <button
+            onClick={() => setShowHow(h => !h)}
+            style={{
+              width:         '100%',
+              textAlign:     'left',
+              background:    'none',
+              border:        'none',
+              color:         'var(--accent)',
+              fontFamily:    'var(--font)',
+              fontSize:      9,
+              letterSpacing: '0.16em',
+              cursor:        'pointer',
+              marginBottom:  showHow ? 10 : 0,
+            }}
+          >
+            {showHow ? '▲' : '▼'} HOW TO PLAY
+          </button>
+
+          {showHow && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
+                ['01', 'CLICK a truck to select'],
+                ['02', 'CLICK a 📍 to dispatch'],
+                ['03', 'Deliver before timer runs out'],
+                ['04', 'Return to 🏭 to refuel'],
+                ['05', 'Rep 0% = game over'],
+              ].map(([n, t]) => (
+                <div key={n} style={{ display: 'flex', gap: 8 }}>
+                  <span style={{ fontSize: 8, color: 'var(--accent)', letterSpacing: '0.1em', flexShrink: 0 }}>
+                    [{n}]
+                  </span>
+                  <span style={{ fontSize: 9, color: 'var(--text-muted)', lineHeight: 1.5, letterSpacing: '0.06em' }}>
+                    {t}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
+
     </div>
   )
 }

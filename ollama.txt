@@ -1,0 +1,27 @@
+# ✦ CLAUDE CODE x OLLAMA: PRODUCTION GUIDE
+
+## 1. PRE-FLIGHT CHECK (SAVE YOUR RAM)
+- Close Chrome/Edge tabs & Discord to get RAM below 70% (10GB/16GB).
+- Run `nvidia-smi` to ensure VRAM is clear for the GPU.
+
+## 2. THE START COMMAND
+# Use the -- separator to pass "Accept Edits" directly to Claude.
+ollama launch claude --model qwen3.5:9b -- --permission-mode acceptEdits
+
+## 3. SESSION SETUP (FIRST 30 SECONDS)
+- Run `/init` to refresh the CLAUDE.md for the current project.
+- Use `Shift + Tab` twice to enter **PLAN MODE** (Stop the autopilot!).
+- Run `/config` -> Select **Output Style: Learning** (Forces the AI to teach).
+
+## 4. THE LEARNING PROMPT PATTERN
+- Don't ask: "Fix this error."
+- Ask: "Analyze @filename, explain the root cause of this error, and suggest a fix. Do not write code yet; ask me 2 clarifying questions first."
+
+## 5. PERFORMANCE & MAINTENANCE
+- `/compact` : Run this every 15 mins to clear bloated chat from VRAM/RAM.
+- `@filename` : Always use the @ symbol to reference specific files. It's faster for the 9B model.
+- `! <command>` : Use the exclamation mark to run shell commands (like 'npm run dev') yourself so you stay in control of the terminal.
+
+## 6. EMERGENCY: "THE CLOUD OVERRIDE"
+# If the 9B model is stuck or hallucinating, use the 480B Cloud model (No RAM cost):
+ollama launch claude --model qwen3.5:cloud

@@ -1,73 +1,114 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { ThemeProvider } from './utils/ThemeContext.jsx'
 import Hub from './games/hub/Hub.jsx'
 import PathQuest from './games/pathquest/PathQuest.jsx'
 import FreightCommander from './games/freight/FreightCommander.jsx'
+import HashBreaker from './games/hashbreaker/HashBreaker.jsx'
+import Codebreaker from './games/codebreaker/Codebreaker.jsx'
 
-// Placeholder — we'll replace these one by one as we build each game
+// Placeholder for games not built yet
 function ComingSoon({ name }) {
   return (
-    <div className="flex items-center justify-center h-full">
-      <p className="text-slate-400 text-lg">{name} — coming soon</p>
+    <div className="flex items-center justify-center h-full"
+      style={{ fontFamily: 'var(--font)' }}>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ color: 'var(--accent)', fontSize: 13, letterSpacing: '0.2em' }}>
+          {name.toUpperCase()}
+        </p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 8, letterSpacing: '0.15em' }}>
+          COMING SOON
+        </p>
+      </div>
     </div>
   )
 }
 
 const GAMES = {
-  pathquest: { title: 'PathQuest', component: PathQuest },
-  freight: { title: 'Freight Commander', component: FreightCommander },
-  vision: { title: 'Vision Hunt', component: () => <ComingSoon name="Vision Hunt" /> },
-  hashbreaker: { title: 'Hash Breaker', component: () => <ComingSoon name="Hash Breaker" /> },
-  codebreaker: { title: 'Codebreaker', component: () => <ComingSoon name="Codebreaker" /> },
+  pathquest:   { title: 'PATHQUEST',         component: PathQuest },
+  freight:     { title: 'FREIGHT CMD',       component: FreightCommander },
+  vision:      { title: 'VISION HUNT',       component: () => <ComingSoon name="Vision Hunt" /> },
+  hashbreaker: { title: 'HASH BREAKER',      component: HashBreaker },
+  codebreaker: { title: 'CODEBREAKER',       component: Codebreaker },
 }
 
 const slide = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
-  exit: { opacity: 0, y: -20, transition: { duration: 0.2 } },
+  initial:  { opacity: 0, y: 16 },
+  animate:  { opacity: 1, y: 0,  transition: { duration: 0.3, ease: 'easeOut' } },
+  exit:     { opacity: 0, y: -16, transition: { duration: 0.18 } },
 }
 
 export default function App() {
   const [current, setCurrent] = useState(null)
-
   const game = current ? GAMES[current] : null
   const GameComponent = game?.component
 
   return (
-    <div className="min-h-screen bg-[#080c14]">
-      <AnimatePresence mode="wait">
+    // ThemeProvider wraps everything — theme is available to all children
+    <ThemeProvider>
+      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        <AnimatePresence mode="wait">
 
-        {/* No game selected → show hub */}
-        {!current && (
-          <motion.div key="hub" {...slide}>
-            <Hub onPlay={(id) => setCurrent(id)} />
-          </motion.div>
-        )}
+          {/* Hub */}
+          {!current && (
+            <motion.div key="hub" {...slide}>
+              <Hub onPlay={(id) => setCurrent(id)} />
+            </motion.div>
+          )}
 
-        {/* Game selected → show game + back button */}
-        {current && (
-          <motion.div key={current} {...slide} className="flex flex-col h-screen">
+          {/* Game shell */}
+          {current && (
+            <motion.div key={current} {...slide}
+              style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
 
-            {/* Top bar with back button */}
-            <header className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-[#080c14]/90 backdrop-blur">
-              <button
-                onClick={() => setCurrent(null)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 bg-white/5 hover:bg-white/10 hover:text-white border border-white/10 transition-all"
-              >
-                ← Back to Hub
-              </button>
-              <span className="text-sm font-bold text-violet-400">{game.title}</span>
-            </header>
+              {/* Top bar */}
+              <header style={{
+                flexShrink:   0,
+                display:      'flex',
+                alignItems:   'center',
+                gap:          12,
+                padding:      '8px 16px',
+                borderBottom: '1px solid var(--border)',
+                background:   'var(--bg)',
+                fontFamily:   'var(--font)',
+              }}>
+                <button
+                  onClick={() => setCurrent(null)}
+                  style={{
+                    display:      'flex',
+                    alignItems:   'center',
+                    gap:          6,
+                    padding:      '5px 12px',
+                    border:       '1px solid var(--border)',
+                    background:   'transparent',
+                    color:        'var(--text-dim)',
+                    fontSize:     11,
+                    fontFamily:   'var(--font)',
+                    letterSpacing:'0.12em',
+                    cursor:       'pointer',
+                  }}
+                >
+                  ← BACK
+                </button>
+                <span style={{
+                  fontSize:     12,
+                  color:        'var(--accent)',
+                  letterSpacing:'0.18em',
+                }}>
+                  {game.title}
+                </span>
+              </header>
 
-            {/* Game fills the rest of the screen */}
-            <main className="flex-1 overflow-hidden">
-              <GameComponent />
-            </main>
+              {/* Game content */}
+              <main style={{ flex: 1, overflow: 'hidden' }}>
+                <GameComponent />
+              </main>
 
-          </motion.div>
-        )}
+            </motion.div>
+          )}
 
-      </AnimatePresence>
-    </div>
+        </AnimatePresence>
+      </div>
+    </ThemeProvider>
   )
 }

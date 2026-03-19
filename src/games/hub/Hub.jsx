@@ -1,282 +1,466 @@
-// Hub.jsx
-// The main arcade menu. Renders the Three.js background behind
-// a grid of game cards. Each card calls onPlay(gameId) when clicked.
+// Hub.jsx — CRT Terminal aesthetic with theme selector
+// Uses CSS variables exclusively — no hardcoded colors
 
-import { useEffect, useRef } from 'react'
-import { motion, useSpring } from 'framer-motion'
-import { Map, Truck, Eye, Hash, Terminal, ArrowRight } from 'lucide-react'
-import ThreeBackground from '../../components/ThreeBackground.jsx'
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useTheme } from '../../utils/ThemeContext.jsx'
+import { THEMES } from '../../utils/themes.js'
 import { sounds } from '../../utils/useSound.js'
 
-// ── Game definitions ───────────────────────────────────────────
+// ── Game roster ────────────────────────────────────────────────
 const GAMES = [
-    {
-        id: 'pathquest',
-        title: 'PathQuest',
-        category: 'Algorithm',
-        desc: 'Visualize Dijkstra\'s shortest-path algorithm on a live grid — or on real city streets via OpenStreetMap.',
-        icon: Map,
-        accent: '#5eead4',
-        glow: 'rgba(20,184,166,0.18)',
-    },
-    {
-        id: 'freight',
-        title: 'Freight Commander',
-        category: 'Strategy',
-        desc: 'Dispatch trucks across a generated city. Manage cargo, fuel, and delivery timers before your reputation collapses.',
-        icon: Truck,
-        accent: '#fbbf24',
-        glow: 'rgba(251,191,36,0.15)',
-    },
-    {
-        id: 'vision',
-        title: 'Vision Hunt',
-        category: 'AI / CV',
-        desc: 'Real-time scavenger hunt powered by TensorFlow.js. Find physical objects before the countdown hits zero.',
-        icon: Eye,
-        accent: '#34d399',
-        glow: 'rgba(52,211,153,0.15)',
-    },
-    {
-        id: 'hashbreaker',
-        title: 'Hash Breaker',
-        category: 'Cryptography',
-        desc: 'Mine a blockchain block by finding the right nonce. Watch real SHA-256 hashes mutate as proof-of-work unfolds.',
-        icon: Hash,
-        accent: '#a3e635',
-        glow: 'rgba(163,230,53,0.12)',
-    },
-    {
-        id: 'codebreaker',
-        title: 'Codebreaker',
-        category: 'Logic',
-        desc: 'Crack the hidden 4-colour sequence in ten attempts. Mastermind-style with mathematically precise feedback.',
-        icon: Terminal,
-        accent: '#c084fc',
-        glow: 'rgba(192,132,252,0.15)',
-    },
+  {
+    id:     'pathquest',
+    num:    '01',
+    title:  'PATHQUEST',
+    sub:    'DIJKSTRA VISUALIZER',
+    desc:   'Shortest-path algorithm on a live grid. Place walls and weights, watch the search expand node by node.',
+    status: 'ONLINE',
+  },
+  {
+    id:     'freight',
+    num:    '02',
+    title:  'FREIGHT CMD',
+    sub:    'LOGISTICS & ROUTING',
+    desc:   'Dispatch trucks across a generated city. Manage cargo, fuel, and delivery timers or lose reputation.',
+    status: 'ONLINE',
+  },
+  {
+    id:     'vision',
+    num:    '03',
+    title:  'VISION HUNT',
+    sub:    'AI OBJECT DETECTION',
+    desc:   'Real-time webcam scavenger hunt. TensorFlow.js detects real-world objects before the countdown expires.',
+    status: 'ONLINE',
+  },
+  {
+    id:     'hashbreaker',
+    num:    '04',
+    title:  'HASH BREAKER',
+    sub:    'BLOCKCHAIN MINING',
+    desc:   'Find the nonce that satisfies proof-of-work. Real SHA-256 hashes mutate live as you mine.',
+    status: 'ONLINE',
+  },
+  {
+    id:     'codebreaker',
+    num:    '05',
+    title:  'CODEBREAKER',
+    sub:    'LOGIC PUZZLE',
+    desc:   'Crack the hidden 4-colour sequence in 10 attempts. Mastermind with mathematically precise peg feedback.',
+    status: 'ONLINE',
+  },
+  {
+    id:     null,
+    num:    '06',
+    title:  'CLASSIFIED',
+    sub:    'ACCESS DENIED',
+    desc:   '████████ ██████ ████ ███████ ██ ████████████ ████ ███',
+    status: 'LOCKED',
+  },
 ]
 
-// ── Framer Motion variants ─────────────────────────────────────
-const containerVariants = {
-    hidden: {},
-    show: {
-        transition: { staggerChildren: 0.09, delayChildren: 0.45 }
-    },
+// ── Typewriter hook ────────────────────────────────────────────
+function useTypewriter(text, speed = 52) {
+  const [out, setOut] = useState('')
+  useEffect(() => {
+    setOut('')
+    let i = 0
+    const id = setInterval(() => {
+      i++
+      setOut(text.slice(0, i))
+      if (i >= text.length) clearInterval(id)
+    }, speed)
+    return () => clearInterval(id)
+  }, [text])
+  return out
 }
-const cardVariants = {
-    hidden: { opacity: 0, y: 30, scale: 0.97 },
-    show: {
-        opacity: 1, y: 0, scale: 1,
-        transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] }
-    },
-}
 
-// ── Single game card ───────────────────────────────────────────
-function GameCard({ game, onPlay }) {
-    const Icon = game.icon
-    const cardRef = useRef(null)
+// ── Theme selector ─────────────────────────────────────────────
+function ThemeSelector() {
+  const { themeId, setThemeId, themes } = useTheme()
+  const [open, setOpen] = useState(false)
 
-    // Spring-based 3D tilt on mouse movement
-    const rotX = useSpring(0, { stiffness: 220, damping: 22 })
-    const rotY = useSpring(0, { stiffness: 220, damping: 22 })
+  return (
+    <div style={{ position: 'relative' }}>
+      {/* Current theme button */}
+      <button
+        onClick={() => { setOpen(o => !o); sounds.click() }}
+        style={{
+          display:       'flex',
+          alignItems:    'center',
+          gap:           8,
+          padding:       '4px 12px',
+          border:        '1px solid var(--border)',
+          background:    'transparent',
+          color:         'var(--accent)',
+          fontFamily:    'var(--font)',
+          fontSize:      10,
+          letterSpacing: '0.15em',
+          cursor:        'pointer',
+        }}
+      >
+        <span style={{ color: 'var(--text-muted)' }}>THEME:</span>
+        {themes[themeId]?.label}
+        <span style={{ color: 'var(--text-muted)' }}>{open ? '▲' : '▼'}</span>
+      </button>
 
-    const onMouseMove = (e) => {
-        const r = cardRef.current?.getBoundingClientRect()
-        if (!r) return
-        rotY.set(((e.clientX - r.left - r.width / 2) / r.width) * 10)
-        rotX.set(((e.clientY - r.top - r.height / 2) / r.height) * -10)
-    }
-    const onMouseLeave = () => { rotX.set(0); rotY.set(0) }
-
-    return (
-        <motion.div
-            ref={cardRef}
-            variants={cardVariants}
-            onMouseMove={onMouseMove}
-            onMouseLeave={onMouseLeave}
-            onMouseEnter={() => sounds.hover()}
-            onClick={() => { sounds.launch(); onPlay(game.id) }}
+      {/* Dropdown */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12 }}
             style={{
-                rotateX: rotX,
-                rotateY: rotY,
-                transformStyle: 'preserve-3d',
-                transformPerspective: 900,
+              position:   'absolute',
+              top:        '100%',
+              right:      0,
+              marginTop:  4,
+              border:     '1px solid var(--border)',
+              background: 'var(--bg2)',
+              zIndex:     100,
+              minWidth:   200,
             }}
-            className="group relative flex flex-col rounded-2xl cursor-pointer select-none"
-        >
-            {/* Glow halo that appears on hover */}
-            <div
-                className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                style={{
-                    background: `radial-gradient(ellipse at 50% 0%, ${game.glow} 0%, transparent 72%)`
+          >
+            {Object.values(themes).map(t => (
+              <button
+                key={t.id}
+                onClick={() => {
+                  setThemeId(t.id)
+                  sounds.click()
+                  setOpen(false)
                 }}
-            />
-
-            {/* Glass card surface */}
-            <div
-                className="relative flex flex-col flex-1 p-6 rounded-2xl border transition-all duration-300 group-hover:border-white/[0.13]"
                 style={{
-                    background: 'rgba(255,255,255,0.034)',
-                    backdropFilter: 'blur(20px)',
-                    WebkitBackdropFilter: 'blur(20px)',
-                    borderColor: 'rgba(255,255,255,0.07)',
-                    boxShadow: '0 2px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.055)',
+                  display:       'block',
+                  width:         '100%',
+                  padding:       '9px 14px',
+                  border:        'none',
+                  borderBottom:  '1px solid var(--border-dim)',
+                  background:    t.id === themeId ? 'var(--accent-bg)' : 'transparent',
+                  color:         t.id === themeId ? 'var(--accent)' : 'var(--text-dim)',
+                  fontFamily:    'var(--font)',
+                  fontSize:      10,
+                  letterSpacing: '0.15em',
+                  textAlign:     'left',
+                  cursor:        'pointer',
                 }}
-            >
-                {/* Icon + category badge */}
-                <div className="flex items-start justify-between mb-5">
-                    <div
-                        className="w-11 h-11 rounded-xl flex items-center justify-center"
-                        style={{
-                            background: `${game.accent}15`,
-                            border: `1px solid ${game.accent}28`,
-                        }}
-                    >
-                        <Icon size={20} style={{ color: game.accent }} />
-                    </div>
-                    <span
-                        className="text-[10px] font-bold tracking-[0.16em] px-2.5 py-1 rounded-full uppercase"
-                        style={{
-                            color: game.accent,
-                            background: `${game.accent}12`,
-                            border: `1px solid ${game.accent}22`,
-                        }}
-                    >
-                        {game.category}
-                    </span>
-                </div>
-
-                {/* Title */}
-                <h3 className="text-[16px] font-bold text-white mb-2 leading-snug tracking-tight">
-                    {game.title}
-                </h3>
-
-                {/* Description */}
-                <p className="text-[13px] text-slate-400 leading-relaxed flex-1">
-                    {game.desc}
-                </p>
-
-                {/* Play now CTA */}
-                <div
-                    className="mt-5 flex items-center gap-2 text-[13px] font-semibold transition-all duration-200 group-hover:gap-3"
-                    style={{ color: game.accent }}
-                >
-                    Play now
-                    <ArrowRight
-                        size={13}
-                        className="transition-transform duration-200 group-hover:translate-x-1"
-                    />
-                </div>
-
-                {/* Shimmer line at bottom on hover */}
-                <div
-                    className="absolute bottom-0 left-6 right-6 h-px opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-full"
-                    style={{
-                        background: `linear-gradient(90deg, transparent, ${game.accent}55, transparent)`
-                    }}
-                />
-            </div>
-        </motion.div>
-    )
+                onMouseEnter={e => {
+                  if (t.id !== themeId) e.target.style.color = 'var(--text)'
+                  sounds.hover()
+                }}
+                onMouseLeave={e => {
+                  if (t.id !== themeId) e.target.style.color = 'var(--text-dim)'
+                }}
+              >
+                {t.id === themeId ? '▶ ' : '  '}{t.label}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
 }
 
-// ── Hub page ───────────────────────────────────────────────────
-export default function Hub({ onPlay }) {
-    // Play ambient sound when hub loads
-    useEffect(() => {
-        const t = setTimeout(() => sounds.ambient(), 400)
-        return () => clearTimeout(t)
-    }, [])
+// ── Game card ──────────────────────────────────────────────────
+function GameCard({ game, onPlay, index }) {
+  const isLocked = game.status === 'LOCKED'
+  const [hovered, setHovered] = useState(false)
 
-    return (
-        <div className="relative min-h-screen overflow-auto">
+  function handleClick() {
+    if (isLocked || !game.id) return
+    sounds.click()
+    onPlay(game.id)
+  }
 
-            {/* Three.js particle network — lives in its own layer */}
-            <ThreeBackground />
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.14, delay: index * 0.055 }}
+      onMouseEnter={() => { setHovered(true);  sounds.hover() }}
+      onMouseLeave={() => { setHovered(false) }}
+      onClick={handleClick}
+      style={{
+        padding:    20,
+        cursor:     isLocked ? 'not-allowed' : 'pointer',
+        opacity:    isLocked ? 0.35 : 1,
+        background: hovered && !isLocked ? 'var(--accent)' : 'transparent',
+        // No transition — instant snap, Nothing OS / CRT feel
+        transition: 'none',
+        fontFamily: 'var(--font)',
+      }}
+    >
+      {/* Header row */}
+      <div style={{
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'space-between',
+        marginBottom:   12,
+      }}>
+        <span style={{
+          fontSize:      10,
+          letterSpacing: '0.18em',
+          color: hovered && !isLocked ? 'rgba(0,0,0,0.55)' : 'var(--text-muted)',
+        }}>
+          [{game.num}] {game.sub}
+        </span>
+        <span style={{
+          fontSize:      9,
+          letterSpacing: '0.14em',
+          padding:       '3px 8px',
+          border:        `1px solid ${hovered && !isLocked ? 'rgba(0,0,0,0.25)' : 'var(--border)'}`,
+          color: hovered && !isLocked ? 'rgba(0,0,0,0.6)' : 'var(--accent)',
+        }}>
+          {game.status}
+        </span>
+      </div>
 
-            {/* Vignette — darkens the edges so cards are readable */}
-            <div
-                className="fixed inset-0 pointer-events-none z-[1]"
-                style={{
-                    background: 'radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.6) 100%)'
-                }}
-            />
+      {/* Title */}
+      <h3 style={{
+        fontSize:      22,
+        fontWeight:    700,
+        letterSpacing: '0.04em',
+        marginBottom:  8,
+        color: hovered && !isLocked ? '#000' : 'var(--text)',
+        textShadow: hovered ? 'none' : `0 0 12px var(--glow)`,
+      }}>
+        {game.title}
+      </h3>
 
-            {/* All UI sits above the background */}
-            <div className="relative z-10 max-w-5xl mx-auto px-6 py-20">
+      {/* Desc */}
+      <p style={{
+        fontSize:   11,
+        lineHeight: 1.65,
+        color: hovered && !isLocked ? 'rgba(0,0,0,0.6)' : 'var(--text-dim)',
+      }}>
+        {game.desc}
+      </p>
 
-                {/* ── Hero text ── */}
-                <motion.div
-                    initial={{ opacity: 0, y: -14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                    className="mb-20"
-                >
-                    {/* Eyebrow line */}
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.2, duration: 0.6 }}
-                        className="flex items-center gap-3 mb-7"
-                    >
-                        <div className="h-px w-8 bg-teal-400/40" />
-                        <span className="text-[11px] font-semibold tracking-[0.22em] uppercase text-teal-400/70">
-                            DevArcade · v1.0
-                        </span>
-                    </motion.div>
-
-                    {/* Main title */}
-                    <h1
-                        className="font-black leading-[1.03] tracking-[-0.03em] text-white mb-6"
-                        style={{
-                            fontFamily: 'monospace',
-                            fontSize: 'clamp(2.2rem, 5.5vw, 4.2rem)',
-                        }}
-                    >
-                        Algorithm &<br />
-                        <span
-                            style={{
-                                backgroundImage: 'linear-gradient(130deg, #5eead4 0%, #818cf8 55%, #c084fc 100%)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                backgroundClip: 'text',
-                            }}
-                        >
-                            Logic Arcade
-                        </span>
-                    </h1>
-
-                    <p className="text-[15px] text-slate-400 max-w-md leading-relaxed">
-                        Five interactive minigames that make computer science tangible —
-                        algorithms, AI, cryptography, and logic.
-                    </p>
-                </motion.div>
-
-                {/* ── Game cards grid ── */}
-                <motion.div
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="show"
-                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-                    style={{ perspective: '1200px' }}
-                >
-                    {GAMES.map(game => (
-                        <GameCard key={game.id} game={game} onPlay={onPlay} />
-                    ))}
-                </motion.div>
-
-                {/* ── Footer ── */}
-                <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 1.4, duration: 0.8 }}
-                    className="mt-20 text-center text-[11px] text-slate-700"
-                >
-                    React · Three.js · TensorFlow.js · Framer Motion
-                </motion.p>
-
-            </div>
+      {/* Execute prompt — shows on hover */}
+      {hovered && !isLocked && (
+        <div style={{
+          marginTop:     12,
+          fontSize:      11,
+          letterSpacing: '0.14em',
+          color:         'rgba(0,0,0,0.7)',
+        }}>
+          {'>'} EXECUTE PROGRAM_
         </div>
-    )
+      )}
+    </motion.div>
+  )
+}
+
+// ── Hub ────────────────────────────────────────────────────────
+export default function Hub({ onPlay }) {
+  const headerText = useTypewriter('SYS.REQ: DEV_ARCADE // ONLINE', 52)
+  const [time, setTime] = useState('')
+
+  // Live clock
+  useEffect(() => {
+    const update = () => {
+      const n = new Date()
+      setTime(
+        n.toTimeString().slice(0, 8) + ':' +
+        String(n.getMilliseconds()).padStart(3, '0')
+      )
+    }
+    update()
+    const id = setInterval(update, 100)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    const t = setTimeout(() => sounds.ambient(), 400)
+    return () => clearTimeout(t)
+  }, [])
+
+  return (
+    <div
+      className="crt-flicker"
+      style={{
+        minHeight:  '100vh',
+        background: 'var(--bg)',
+        fontFamily: 'var(--font)',
+        overflowY:  'auto',
+      }}
+    >
+      {/* CRT overlays */}
+      <div className="crt-scanlines" style={{
+        position:       'fixed', inset: 0, zIndex: 50,
+        pointerEvents:  'none', opacity: 0.35,
+      }} />
+      <div className="crt-vignette" style={{
+        position:      'fixed', inset: 0, zIndex: 50,
+        pointerEvents: 'none',
+      }} />
+
+      <div style={{ position: 'relative', zIndex: 10, maxWidth: 900, margin: '0 auto', padding: '36px 32px' }}>
+
+        {/* ── Top bar ── */}
+        <div style={{
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'space-between',
+          paddingBottom:  12,
+          borderBottom:   '1px solid var(--border-dim)',
+          marginBottom:   6,
+        }}>
+          {/* Typewriter */}
+          <span style={{
+            fontSize:      12,
+            letterSpacing: '0.15em',
+            color:         'var(--accent)',
+            borderRight:   '2px solid var(--accent)',
+            paddingRight:  3,
+            animation:     'caret-blink 0.7s step-end infinite',
+          }}>
+            {headerText}
+          </span>
+
+          {/* Clock */}
+          <span style={{ fontSize: 10, letterSpacing: '0.12em', color: 'var(--text-muted)' }}>
+            {time}
+          </span>
+        </div>
+
+        {/* ── System info row ── */}
+        <div style={{
+          display:       'flex',
+          gap:           28,
+          paddingBottom: 28,
+          borderBottom:  '1px solid var(--border-dim)',
+          marginBottom:  32,
+          flexWrap:      'wrap',
+          alignItems:    'center',
+        }}>
+          {[['KERNEL','v1.0.0'],['MODULES','5 LOADED'],['MEM','OK'],['STATUS','NOMINAL']].map(([k, v]) => (
+            <div key={k} style={{ display: 'flex', gap: 8 }}>
+              <span style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--text-muted)' }}>{k}:</span>
+              <span style={{ fontSize: 10, letterSpacing: '0.14em', color: 'var(--accent-dim)' }}>{v}</span>
+            </div>
+          ))}
+
+          {/* Theme selector pushed to the right */}
+          <div style={{ marginLeft: 'auto' }}>
+            <ThemeSelector />
+          </div>
+        </div>
+
+        {/* ── Hero ── */}
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <motion.h1
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.7, duration: 0.4 }}
+            style={{
+              fontFamily:    'var(--font-display)',
+              fontSize:      'clamp(3.5rem, 12vw, 8rem)',
+              fontWeight:    700,
+              letterSpacing: '0.06em',
+              lineHeight:    1,
+              color:         'var(--accent)',
+              textShadow:    '0 0 30px var(--glow), 0 0 60px var(--glow)',
+              marginBottom:  12,
+            }}
+          >
+            ARCADE.EXE
+          </motion.h1>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.0, duration: 0.3 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center' }}
+          >
+            <div style={{ flex: 1, height: 1, background: 'var(--border-dim)' }} />
+            <span style={{ fontSize: 10, letterSpacing: '0.28em', color: 'var(--text-muted)' }}>
+              ALGORITHM & LOGIC PLATFORM // SELECT PROGRAM
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'var(--border-dim)' }} />
+          </motion.div>
+        </div>
+
+        {/* ── Game grid ── */}
+        <div style={{
+          display:       'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+          border:        '1px solid var(--border)',
+          marginBottom:  32,
+        }}>
+          {GAMES.map((game, i) => {
+            const cols   = window.innerWidth >= 780 ? 3 : window.innerWidth >= 520 ? 2 : 1
+            const isLast = i >= GAMES.length - cols
+            const isRight = (i + 1) % cols === 0
+
+            return (
+              <div
+                key={game.id ?? game.num}
+                style={{
+                  borderRight:  isRight ? 'none' : '1px solid var(--border)',
+                  borderBottom: isLast  ? 'none' : '1px solid var(--border)',
+                }}
+              >
+                <GameCard game={game} onPlay={onPlay} index={i} />
+              </div>
+            )
+          })}
+        </div>
+
+        {/* ── How to use ── */}
+        <div style={{
+          padding:      20,
+          border:       '1px solid var(--border-dim)',
+          marginBottom: 28,
+        }}>
+          <p style={{
+            fontSize:      10,
+            letterSpacing: '0.2em',
+            color:         'var(--text-muted)',
+            marginBottom:  14,
+          }}>
+            // SYSTEM MANUAL
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+            {[
+              { cmd: 'HOVER',      desc: 'Preview program' },
+              { cmd: 'CLICK',      desc: 'Execute program' },
+              { cmd: 'THEME ▼',    desc: 'Change color theme' },
+              { cmd: '← BACK',     desc: 'Return to terminal' },
+            ].map(({ cmd, desc }) => (
+              <div key={cmd} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <span style={{ color: 'var(--accent)', fontSize: 14, lineHeight: 1, flexShrink: 0 }}>{'>'}</span>
+                <div>
+                  <p style={{ fontSize: 11, letterSpacing: '0.12em', color: 'var(--text)', marginBottom: 2 }}>{cmd}</p>
+                  <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Footer ── */}
+        <div style={{
+          display:    'flex',
+          alignItems: 'center',
+          gap:        8,
+          paddingTop: 16,
+          borderTop:  '1px solid var(--border-dim)',
+        }}>
+          <span style={{ fontSize: 12, letterSpacing: '0.12em', color: 'var(--text-muted)' }}>
+            root@devarcade:~$
+          </span>
+          <span
+            className="cursor-blink"
+            style={{ fontSize: 20, lineHeight: 1, color: 'var(--accent)', fontFamily: 'var(--font-display)' }}
+          >
+            █
+          </span>
+        </div>
+
+      </div>
+    </div>
+  )
 }

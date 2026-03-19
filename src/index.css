@@ -5,74 +5,191 @@
 *,
 *::before,
 *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
 html,
 body,
 #root {
-  height: 100%;
-  background: #080c14;
-  color: #e2e8f0;
+    height: 100%;
+    background: #080c14;
+    color: #e2e8f0;
 }
 
 /* PathQuest cell animations */
 @keyframes visWave {
-  0% {
-    transform: scale(0.15);
-    border-radius: 50%;
-    background-color: #a78bfa;
-  }
+    0% {
+        transform: scale(0.15);
+        border-radius: 50%;
+        background-color: #a78bfa;
+    }
 
-  55% {
-    transform: scale(1.25);
-    border-radius: 30%;
-    background-color: #7c3aed;
-  }
+    55% {
+        transform: scale(1.25);
+        border-radius: 30%;
+        background-color: #7c3aed;
+    }
 
-  100% {
-    transform: scale(1.0);
-    border-radius: 2px;
-    background-color: #4338ca;
-  }
+    100% {
+        transform: scale(1);
+        border-radius: 2px;
+        background-color: #4338ca;
+    }
 }
 
 @keyframes pathPop {
-  0% {
-    transform: scale(0.3);
-    background-color: #fef08a;
-  }
+    0% {
+        transform: scale(0.3);
+        background-color: #fef08a;
+    }
 
-  65% {
-    transform: scale(1.35);
-  }
+    65% {
+        transform: scale(1.35);
+    }
 
-  100% {
-    transform: scale(1.0);
-    background-color: #fde047;
-  }
+    100% {
+        transform: scale(1);
+        background-color: #fde047;
+    }
 }
 
 @keyframes wallSlam {
-  0% {
-    transform: scale(1.2);
-  }
+    0% {
+        transform: scale(1.2);
+    }
 
-  100% {
-    transform: scale(1.0);
-  }
+    100% {
+        transform: scale(1);
+    }
 }
 
 .anim-vis {
-  animation: visWave 0.48s ease-out forwards;
+    animation: visWave 0.48s ease-out forwards;
 }
 
 .anim-path {
-  animation: pathPop 0.38s ease-out forwards;
+    animation: pathPop 0.38s ease-out forwards;
 }
 
 .anim-wall {
-  animation: wallSlam 0.12s ease-out forwards;
+    animation: wallSlam 0.12s ease-out forwards;
+}
+
+/* ── CRT Terminal Theme ─────────────────────────────────── */
+
+/* Font families */
+.font-vt323 {
+    font-family: "VT323", monospace;
+}
+.font-share-tech {
+    font-family: "Share Tech Mono", monospace;
+}
+
+/* Amber glow on text */
+.amber-glow {
+    color: #ffb000;
+    text-shadow:
+        0 0 6px rgba(255, 176, 0, 0.9),
+        0 0 14px rgba(255, 176, 0, 0.5),
+        0 0 30px rgba(255, 176, 0, 0.2);
+}
+
+/* Amber glow on borders */
+.amber-border-glow {
+    border-color: #ffb000;
+    box-shadow:
+        0 0 4px rgba(255, 176, 0, 0.5),
+        inset 0 0 4px rgba(255, 176, 0, 0.05);
+}
+
+/* Scanline pattern overlay */
+.crt-scanlines {
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.18) 2px,
+        rgba(0, 0, 0, 0.18) 4px
+    );
+}
+
+/* Vignette — darkens corners */
+.crt-vignette {
+    background: radial-gradient(
+        ellipse at center,
+        transparent 55%,
+        rgba(0, 0, 0, 0.75) 100%
+    );
+}
+
+/* Screen flicker — subtle, fires occasionally */
+@keyframes crt-flicker {
+    0%,
+    87%,
+    92%,
+    100% {
+        opacity: 1;
+    }
+    89% {
+        opacity: 0.96;
+    }
+    90% {
+        opacity: 1;
+    }
+    91% {
+        opacity: 0.97;
+    }
+}
+.crt-flicker {
+    animation: crt-flicker 9s infinite;
+}
+
+/* Blinking block cursor */
+@keyframes blink-cursor {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0;
+    }
+}
+.cursor-blink {
+    animation: blink-cursor 1s step-end infinite;
+}
+
+/* Typewriter caret */
+@keyframes caret-blink {
+    0%,
+    100% {
+        border-right-color: #ffb000;
+    }
+    50% {
+        border-right-color: transparent;
+    }
+}
+.typewriter-caret {
+    border-right: 2px solid #ffb000;
+    animation: caret-blink 0.7s step-end infinite;
+    padding-right: 3px;
+}
+
+/* Sharp hover snap — instant invert, no fade */
+.crt-card {
+    border: 1px solid #ffb000;
+    background: transparent;
+    transition: none;
+    cursor: pointer;
+}
+.crt-card:hover {
+    background: #ffb000;
+}
+.crt-card:hover .crt-text {
+    color: #050505;
+    text-shadow: none;
+}
+.crt-card:hover .crt-dim {
+    color: rgba(5, 5, 5, 0.65);
 }

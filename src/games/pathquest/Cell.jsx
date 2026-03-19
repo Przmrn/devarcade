@@ -1,59 +1,60 @@
 // Cell.jsx
-// A single node on the pathfinding grid.
-// React.memo means this only re-renders when ITS node prop changes.
-// Without memo, all 576 cells re-render every animation frame.
+// Single grid node. React.memo prevents re-renders unless this
+// specific node's data changes — critical for animation performance.
 
 import { memo } from 'react'
 
+// Game colours — intentionally NOT themed.
+// These encode algorithm state so they must be visually distinct
+// regardless of which theme is active.
+const STATE = {
+  start:   { bg: '#34d399', shadow: '0 0 7px rgba(52,211,153,0.55)' },
+  end:     { bg: '#f43f5e', shadow: '0 0 7px rgba(244,63,94,0.55)'  },
+  path:    { bg: '#fde047', shadow: '0 0 5px rgba(253,224,71,0.45)', anim: 'anim-path' },
+  visited: { bg: '#4338ca', shadow: 'none',                           anim: 'anim-vis'  },
+  wall:    { bg: '#0f172a', shadow: 'none',                           anim: 'anim-wall' },
+  weight:  { bg: '#1c0a00', shadow: 'none'                           },
+  empty:   { bg: 'transparent', shadow: 'none'                       },
+}
+
 function Cell({ node, onMouseDown, onMouseEnter, onMouseUp }) {
-    const { isStart, isEnd, isWall, isWeight, isVisited, isPath } = node
+  const { isStart, isEnd, isWall, isWeight, isVisited, isPath } = node
 
-    // Decide background colour based on node state
-    let bg = 'bg-slate-950'
-    let anim = ''
-    let shadow = ''
+  let state = STATE.empty
+  if      (isStart)   state = STATE.start
+  else if (isEnd)     state = STATE.end
+  else if (isPath)    state = STATE.path
+  else if (isVisited) state = STATE.visited
+  else if (isWall)    state = STATE.wall
+  else if (isWeight)  state = STATE.weight
 
-    if (isStart) {
-        bg = 'bg-emerald-400'
-        shadow = 'shadow-[0_0_6px_rgba(52,211,153,0.5)]'
-    } else if (isEnd) {
-        bg = 'bg-rose-500'
-        shadow = 'shadow-[0_0_6px_rgba(244,63,94,0.5)]'
-    } else if (isPath) {
-        bg = 'bg-yellow-300'
-        anim = 'anim-path'
-        shadow = 'shadow-[0_0_4px_rgba(253,224,71,0.4)]'
-    } else if (isVisited) {
-        bg = 'bg-indigo-700'
-        anim = 'anim-vis'
-    } else if (isWall) {
-        bg = 'bg-slate-900'
-        anim = 'anim-wall'
-    } else if (isWeight) {
-        bg = 'bg-amber-950'
-    }
-
-    return (
-        <div
-            className={`
-        border border-slate-800/40
-        flex items-center justify-center
-        cursor-crosshair
-        hover:brightness-125
-        transition-colors duration-75
-        ${bg} ${shadow} ${anim}
-      `}
-            onMouseDown={onMouseDown}
-            onMouseEnter={onMouseEnter}
-            onMouseUp={onMouseUp}
-        >
-            {isStart && <span className="text-emerald-900 text-[9px] font-black pointer-events-none">▶</span>}
-            {isEnd && <span className="text-white text-[9px] font-black pointer-events-none">◉</span>}
-            {isWeight && !isStart && !isEnd && (
-                <span className="text-amber-900 pointer-events-none" style={{ fontSize: 7 }}>⬡</span>
-            )}
-        </div>
-    )
+  return (
+    <div
+      className={state.anim ?? ''}
+      style={{
+        background: state.bg,
+        boxShadow:  state.shadow,
+        border:     '1px solid var(--border-dim)',
+        display:    'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor:     'crosshair',
+      }}
+      onMouseDown={onMouseDown}
+      onMouseEnter={onMouseEnter}
+      onMouseUp={onMouseUp}
+    >
+      {isStart && (
+        <span style={{ fontSize: 9, fontWeight: 900, color: '#064e3b', pointerEvents: 'none', userSelect: 'none' }}>▶</span>
+      )}
+      {isEnd && (
+        <span style={{ fontSize: 9, fontWeight: 900, color: 'white', pointerEvents: 'none', userSelect: 'none' }}>◉</span>
+      )}
+      {isWeight && !isStart && !isEnd && (
+        <span style={{ fontSize: 7, color: '#92400e', pointerEvents: 'none', userSelect: 'none' }}>⬡</span>
+      )}
+    </div>
+  )
 }
 
 export default memo(Cell)
